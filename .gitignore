@@ -1,0 +1,5 @@
+.idea/
+data*.json
+*.jpg
+*.pyc
+*.pt
