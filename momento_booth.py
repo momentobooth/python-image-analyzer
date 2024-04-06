@@ -12,7 +12,7 @@ from ultralytics import YOLO
 import ultralytics.engine.results as yolo_results
 
 
-def detect_people(img: Path) -> yolo_results.Results:
+def detect_people(model: YOLO, img: Path) -> yolo_results.Results:
     return model.predict(img, conf=0.5, verbose=False)[0]
 
 
@@ -23,7 +23,7 @@ class FacesResult:
 
 
 def detect_faces(image: Path | Image.Image):
-    pillow_source_img = Image.open(image) if type(image) is Path else image
+    pillow_source_img = Image.open(image) if issubclass(type(image), Path) else image
 
     original_size = pillow_source_img.size
     pillow_source_img.thumbnail((600, 600))
@@ -43,7 +43,7 @@ def get_faces(sources: list[Path | Image.Image]) -> FacesResult:
     best_photo = num_faces.index(max(num_faces))
 
     # Load the jpg file into a numpy array
-    pillow_source_img = Image.open(sources[best_photo]) if type(sources[best_photo]) is Path else sources[best_photo]
+    pillow_source_img = Image.open(sources[best_photo]) if issubclass(type(sources[best_photo]), Path) else sources[best_photo]
     np_image = np.array(pillow_source_img)
 
     start_encoding_face = time.time()
@@ -65,7 +65,7 @@ def date_from_exif(exif_dict: dict) -> datetime:
     return datetime.strptime(date_raw, "%Y:%m:%d %H:%M:%S")
 
 
-def process_collage(collage: Path, source_imgs: dict, already_processed=False) -> (dict, None):
+def process_collage(collage: Path, source_imgs: dict, model: YOLO, already_processed=False) -> (dict, None):
     start = time.time()
     pillow_collage_img = Image.open(collage)
     print(f"Opening image {collage.stem}")
@@ -89,7 +89,7 @@ def process_collage(collage: Path, source_imgs: dict, already_processed=False) -
         print(f"\tImage has {len(sources)} source(s)")
     last_source = sources[-1]
 
-    result = detect_people(last_source)
+    result = detect_people(model, last_source)
     print(f"\tDetected {len(result.boxes)} people in {sum(result.speed.values()):.1f} ms")
 
     face_results = get_faces(sources)

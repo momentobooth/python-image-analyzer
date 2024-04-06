@@ -81,6 +81,8 @@ def prepare_file_lists(collage_path: Path, source_path: Path):
 
 def process_thread(data_file_path: Path):
     global process_list, source_imgs
+    model = YOLO('yolov8x-pose-p6.pt')  # load the pretrained model
+
     while True:
         # If there are no images to process, sleep for a bit
         if len(process_list) == 0:
@@ -89,7 +91,7 @@ def process_thread(data_file_path: Path):
 
         collage_img_path = process_list.pop()
         already_processed = collage_img_path.name in data
-        process_result = process_collage(collage_img_path, source_imgs, already_processed)
+        process_result = process_collage(collage_img_path, source_imgs, model, already_processed)
         if already_processed:
             print(f"Skipping {collage_img_path.name}, already in database")
             continue
