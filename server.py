@@ -46,10 +46,20 @@ def get_matching_imgs():
 
 
 class CollageWatcherHandler(FileSystemEventHandler):
-    def on_created(self, event: FileSystemEvent) -> None:
+    def on_created(self, event: FileSystemEvent):
         print(f"Collage got created, {event.src_path}")
         process_list.append(Path(event.src_path))
         pass
+
+    def on_modified(self, event: FileSystemEvent):
+        self.on_deleted(event)
+        self.on_created(event)
+
+    def on_deleted(self, event: FileSystemEvent):
+        p = Path(event.src_path)
+        del data[p.name]
+        save_data(data, data_file_path)
+        print(f"Collage got removed, {event.src_path}")
 
 
 class SourceWatcherHandler(FileSystemEventHandler):
