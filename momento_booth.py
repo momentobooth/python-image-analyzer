@@ -22,8 +22,8 @@ class FacesResult:
         self.speed = {'detection': detection*1000, 'encoding': encoding*1000}
 
 
-def detect_faces(image: Path):
-    pillow_source_img = Image.open(image)
+def detect_faces(image: Path | Image.Image):
+    pillow_source_img = Image.open(image) if type(image) is Path else image
 
     original_size = pillow_source_img.size
     pillow_source_img.thumbnail((600, 600))
@@ -36,14 +36,14 @@ def detect_faces(image: Path):
     return face_locations
 
 
-def get_faces(sources: list[Path]) -> FacesResult:
+def get_faces(sources: list[Path | Image.Image]) -> FacesResult:
     start_detecting_face = time.time()
     imgs_faces = [detect_faces(source) for source in sources]
     num_faces = [len(faces) for faces in imgs_faces]
     best_photo = num_faces.index(max(num_faces))
 
     # Load the jpg file into a numpy array
-    pillow_source_img = Image.open(sources[best_photo])
+    pillow_source_img = Image.open(sources[best_photo]) if type(sources[best_photo]) is Path else sources[best_photo]
     np_image = np.array(pillow_source_img)
 
     start_encoding_face = time.time()
