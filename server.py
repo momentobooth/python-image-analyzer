@@ -89,7 +89,7 @@ def process_thread(data_file_path: Path):
             time.sleep(0.1)
             continue
 
-        collage_img_path = process_list.pop()
+        collage_img_path = process_list.pop(0)
         already_processed = collage_img_path.name in data
         process_result = process_collage(collage_img_path, source_imgs, model, already_processed)
         if already_processed:
