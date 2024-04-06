@@ -52,7 +52,7 @@ def get_faces(sources: list[Path | Image.Image]) -> FacesResult:
     return FacesResult(face_encodings, start_encoding_face - start_detecting_face, face_end - start_encoding_face)
 
 
-def find_image(name):
+def find_image(name: str, source_imgs: dict):
     for source, taken in source_imgs.items():
         if not taken and name in source.name:
             source_imgs[source] = True
@@ -65,7 +65,7 @@ def date_from_exif(exif_dict: dict) -> datetime:
     return datetime.strptime(date_raw, "%Y:%m:%d %H:%M:%S")
 
 
-def process_collage(collage: Path, already_processed=False) -> (dict, None):
+def process_collage(collage: Path, source_imgs: dict, already_processed=False) -> (dict, None):
     start = time.time()
     pillow_collage_img = Image.open(collage)
     print(f"Opening image {collage.stem}")
@@ -74,7 +74,7 @@ def process_collage(collage: Path, already_processed=False) -> (dict, None):
     json_obj = json.loads(json_str)
     print(f"\tJSON object: {json_obj}")
     raw_sources = json_obj["sourcePhotos"]
-    found_sources = (find_image(source['filename']) for source in raw_sources)
+    found_sources = (find_image(source['filename'], source_imgs) for source in raw_sources)
     sources = [s for s in found_sources if s is not None]
     if already_processed:
         return None
@@ -129,7 +129,7 @@ if __name__ == "__main__":
     i = 0
     for collage_img_path in output_imgs:
         already_processed = collage_img_path.name in data
-        process_result = process_collage(collage_img_path, already_processed)
+        process_result = process_collage(collage_img_path, source_imgs, already_processed)
         if already_processed:
             print(f"Skipping {collage_img_path.name}, already in database")
             continue

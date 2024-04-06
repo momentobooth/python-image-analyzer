@@ -1,4 +1,5 @@
 import argparse
+import threading
 
 from flask import Flask, request, send_from_directory, jsonify
 from watchdog.events import FileSystemEventHandler, FileSystemEvent
@@ -10,6 +11,8 @@ from momento_booth_image_search import get_matching_images
 app = Flask(__name__)
 last_image = None
 last_analysis = None
+process_list = []
+source_imgs = {}
 data = {}
 
 
@@ -45,12 +48,14 @@ def get_matching_imgs():
 class CollageWatcherHandler(FileSystemEventHandler):
     def on_created(self, event: FileSystemEvent) -> None:
         print(f"Collage got created, {event.src_path}")
+        process_list.append(Path(event.src_path))
         pass
 
 
 class SourceWatcherHandler(FileSystemEventHandler):
     def on_created(self, event: FileSystemEvent) -> None:
         print(f"Source image got created, {event.src_path}")
+        source_imgs[Path(event.src_path)] = False
         pass
 
 
@@ -68,6 +73,31 @@ def directory_type(raw_path: str) -> Path:
     return p
 
 
+def prepare_file_lists(collage_path: Path, source_path: Path):
+    global process_list, source_imgs
+    process_list = list(collage_path.glob("*.jpg"))
+    source_imgs = {path: False for path in source_path.glob("*.jpg")}
+
+
+def process_thread(data_file_path: Path):
+    global process_list, source_imgs
+    while True:
+        # If there are no images to process, sleep for a bit
+        if len(process_list) == 0:
+            time.sleep(0.1)
+            continue
+
+        collage_img_path = process_list.pop()
+        already_processed = collage_img_path.name in data
+        process_result = process_collage(collage_img_path, source_imgs, already_processed)
+        if already_processed:
+            print(f"Skipping {collage_img_path.name}, already in database")
+            continue
+        if process_result is not None:
+            data[collage_img_path.name] = process_result
+            save_data(data, data_file_path)
+
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description="MomentoBooth image processing companion server")
     parser.add_argument("--collage-dir", type=directory_type, help="Output directory")
@@ -78,4 +108,6 @@ if __name__ == '__main__':
     data_file_path = Path("data.json")
     data = load_data(data_file_path)
     watcher(args.collage_dir, args.source_dir)
+    prepare_file_lists(args.collage_dir, args.source_dir)
+    threading.Thread(target=process_thread, args=[data_file_path]).start()
     app.run(host="::", port=5000, debug=True, use_reloader=False)
