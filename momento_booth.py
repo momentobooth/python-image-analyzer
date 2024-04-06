@@ -1,3 +1,4 @@
+import threading
 import time
 from pathlib import Path
 from datetime import datetime, timedelta
@@ -10,6 +11,8 @@ import json
 
 from ultralytics import YOLO
 import ultralytics.engine.results as yolo_results
+
+face_lock = threading.Lock()
 
 
 def detect_people(model: YOLO, img: Path) -> yolo_results.Results:
@@ -37,6 +40,7 @@ def detect_faces(image: Path | Image.Image):
 
 
 def get_faces(sources: list[Path | Image.Image]) -> FacesResult:
+    face_lock.acquire(blocking=True)
     start_detecting_face = time.time()
     imgs_faces = [detect_faces(source) for source in sources]
     num_faces = [len(faces) for faces in imgs_faces]
@@ -49,6 +53,7 @@ def get_faces(sources: list[Path | Image.Image]) -> FacesResult:
     start_encoding_face = time.time()
     face_encodings = face_recognition.face_encodings(np_image, imgs_faces[best_photo])
     face_end = time.time()
+    face_lock.release()
     return FacesResult(face_encodings, start_encoding_face - start_detecting_face, face_end - start_encoding_face)
 
 
