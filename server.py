@@ -76,7 +76,6 @@ if __name__ == '__main__':
     print(f"Running with \n - Collage dir: {args.collage_dir}\n - Source dir: {args.source_dir}")
 
     data_file_path = Path("data.json")
-    with open(data_file_path, "r") as f:
-        data: dict = json.loads(f.read())
+    data = load_data(data_file_path)
     watcher(args.collage_dir, args.source_dir)
     app.run(host="::", port=5000, debug=True, use_reloader=False)

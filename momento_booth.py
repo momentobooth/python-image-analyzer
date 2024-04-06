@@ -102,6 +102,19 @@ def process_collage(collage: Path, already_processed=False) -> (dict, None):
     }
 
 
+def load_data(file_path: Path) -> dict:
+    if file_path.is_file():
+        with open(file_path, "r") as f:
+            return json.loads(f.read())
+    else:
+        return {}
+
+
+def save_data(data:dict, file_path: Path):
+    with open(file_path, "w") as f:
+        f.write(json.dumps(data))
+
+
 if __name__ == "__main__":
     output_dir = Path("K:\\Pictures\\Photos\\2024-03-23 WuBDA Gala\\Output")
     source_dir = Path("K:\\Pictures\\Photos\\2024-03-23 WuBDA Gala\\From camera")
@@ -109,11 +122,7 @@ if __name__ == "__main__":
 
     # Check if data.json exists
     data_file_path = Path("data.json")
-    if data_file_path.is_file():
-        with open(data_file_path, "r") as f:
-            data = json.loads(f.read())
-    else:
-        data = {}
+    data = load_data(data_file_path)
 
     output_imgs = output_dir.glob("*.jpg")
     source_imgs = {path: False for path in source_dir.glob("*.jpg")}
@@ -128,9 +137,7 @@ if __name__ == "__main__":
             data[collage_img_path.name] = process_result
             i = i+1
         if i % 5 == 0:
-            with open(data_file_path, "w") as f:
-                f.write(json.dumps(data))
-                print(f"Saved {data_file_path.name}")
-    with open(data_file_path, "w") as f:
-        f.write(json.dumps(data))
+            save_data(data, data_file_path)
+            print(f"Saved {data_file_path.name}")
+    save_data(data, data_file_path)
     print("Completed analysis!")

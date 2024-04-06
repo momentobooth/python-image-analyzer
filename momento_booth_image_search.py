@@ -1,12 +1,5 @@
 import os
-import time
 from pathlib import Path
-
-import face_recognition
-import numpy as np
-from PIL import Image
-import piexif
-import json
 
 from momento_booth import *
 
@@ -29,10 +22,8 @@ if __name__ == "__main__":
     output_dir = Path("K:\\Pictures\\Photos\\2024-03-23 WuBDA Gala\\Output")
     test_img = Path("test-2.jpg")
 
-    # Check if data.json exists
     data_file_path = Path("data.json")
-    with open(data_file_path, "r") as f:
-        data: dict = json.loads(f.read())
+    data = load_data(data_file_path)
 
     test_encodings = get_faces([test_img]).encodings
 
