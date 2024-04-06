@@ -52,23 +52,36 @@ def get_faces(sources: list[Path]) -> FacesResult:
     return FacesResult(face_encodings, start_encoding_face - start_detecting_face, face_end - start_encoding_face)
 
 
-def find_image(source, time, dir):
-    options = list(source_dir.glob(f"*{source}"))
+def find_image(name):
+    for source, taken in source_imgs.items():
+        if not taken and name in source.name:
+            source_imgs[source] = True
+            return source
+    return None
 
 
-def process_collage(source: Path) -> (dict, None):
+def date_from_exif(exif_dict: dict) -> datetime:
+    date_raw = exif_dict['Exif'][piexif.ExifIFD.DateTimeDigitized].decode("utf-8")
+    return datetime.strptime(date_raw, "%Y:%m:%d %H:%M:%S")
+
+
+def process_collage(collage: Path, already_processed=False) -> (dict, None):
     start = time.time()
-    pillow_collage_img = Image.open(source)
-    print(f"Opening image {source.stem}")
+    pillow_collage_img = Image.open(collage)
+    print(f"Opening image {collage.stem}")
     exif_dict = piexif.load(pillow_collage_img.info["exif"])
     json_str = exif_dict["Exif"][piexif.ExifIFD.MakerNote]
     json_obj = json.loads(json_str)
     print(f"\tJSON object: {json_obj}")
-    date_raw = exif_dict['Exif'][piexif.ExifIFD.DateTimeDigitized].decode("utf-8")
-    date_p = datetime.strptime(date_raw, "%Y:%m:%d %H:%M:%S")
+    raw_sources = json_obj["sourcePhotos"]
+    found_sources = (find_image(source['filename']) for source in raw_sources)
+    sources = [s for s in found_sources if s is not None]
+    if already_processed:
+        return None
+
+    date_p = date_from_exif(exif_dict)
     date_s = date_p.strftime("%Y%m%d_%H")
-    sources = [next(source_dir.glob(f"{date_s}*{x['filename']}"), None) for x in json_obj["sourcePhotos"]]
-    sources = [source for source in sources if source is not None]
+
     if len(sources) == 0:
         print("\tCould not find source files, skipping")
         return None
@@ -103,12 +116,14 @@ if __name__ == "__main__":
         data = {}
 
     output_imgs = output_dir.glob("*.jpg")
+    source_imgs = {path: False for path in source_dir.glob("*.jpg")}
     i = 0
     for collage_img_path in output_imgs:
-        if collage_img_path.name in data:
+        already_processed = collage_img_path.name in data
+        process_result = process_collage(collage_img_path, already_processed)
+        if already_processed:
             print(f"Skipping {collage_img_path.name}, already in database")
             continue
-        process_result = process_collage(collage_img_path)
         if process_result is not None:
             data[collage_img_path.name] = process_result
             i = i+1
