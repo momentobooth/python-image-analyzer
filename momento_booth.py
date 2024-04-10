@@ -57,12 +57,20 @@ def get_faces(sources: list[Path | Image.Image]) -> FacesResult:
     return FacesResult(face_encodings, start_encoding_face - start_detecting_face, face_end - start_encoding_face)
 
 
-def find_image(name: str, source_imgs: dict):
-    for source, taken in source_imgs.items():
-        if not taken and name in source.name:
-            source_imgs[source] = True
-            return source
-    return None
+def find_image(name: str, collage_path: Path, source_dir: Path) -> Path | None:
+    source_imgs = list(source_dir.glob(f"*{name}"))
+    if len(source_imgs) == 0:
+        return None
+    collage_time = date_from_image(collage_path)
+    time_differences = [abs(collage_time - date_from_image(img) - timedelta(seconds=280)) for img in source_imgs]
+    min_diff = min(time_differences)
+    min_index = time_differences.index(min_diff)
+    return source_imgs[min_index]
+
+
+def date_from_image(image: Path):
+    pillow_img = Image.open(image)
+    return date_from_exif(piexif.load(pillow_img.info["exif"]))
 
 
 def date_from_exif(exif_dict: dict) -> datetime:
@@ -70,7 +78,7 @@ def date_from_exif(exif_dict: dict) -> datetime:
     return datetime.strptime(date_raw, "%Y:%m:%d %H:%M:%S")
 
 
-def process_collage(collage: Path, source_imgs: dict, model: YOLO, already_processed=False) -> (dict, None):
+def process_collage(collage: Path, source_dir: Path, model: YOLO, already_processed=False) -> (dict, None):
     start = time.time()
     pillow_collage_img = Image.open(collage)
     print(f"Opening image {collage.stem}")
@@ -79,7 +87,7 @@ def process_collage(collage: Path, source_imgs: dict, model: YOLO, already_proce
     json_obj = json.loads(json_str)
     print(f"\tJSON object: {json_obj}")
     raw_sources = json_obj["sourcePhotos"]
-    found_sources = (find_image(source['filename'], source_imgs) for source in raw_sources)
+    found_sources = (find_image(source['filename'], collage, source_dir) for source in raw_sources)
     sources = [s for s in found_sources if s is not None]
     if already_processed:
         return None
@@ -130,11 +138,11 @@ if __name__ == "__main__":
     data = load_data(data_file_path)
 
     output_imgs = output_dir.glob("*.jpg")
-    source_imgs = {path: False for path in source_dir.glob("*.jpg")}
+    source_imgs = list(source_dir.glob("*.jpg"))
     i = 0
     for collage_img_path in output_imgs:
         already_processed = collage_img_path.name in data
-        process_result = process_collage(collage_img_path, source_imgs, already_processed)
+        process_result = process_collage(collage_img_path, source_dir, model, already_processed)
         if already_processed:
             print(f"Skipping {collage_img_path.name}, already in database")
             continue

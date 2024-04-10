@@ -65,7 +65,7 @@ class CollageWatcherHandler(FileSystemEventHandler):
 class SourceWatcherHandler(FileSystemEventHandler):
     def on_created(self, event: FileSystemEvent) -> None:
         print(f"Source image got created, {event.src_path}")
-        source_imgs[Path(event.src_path)] = False
+        source_imgs.append(Path(event.src_path))
         pass
 
 
@@ -86,10 +86,10 @@ def directory_type(raw_path: str) -> Path:
 def prepare_file_lists(collage_path: Path, source_path: Path):
     global process_list, source_imgs
     process_list = list(collage_path.glob("*.jpg"))
-    source_imgs = {path: False for path in source_path.glob("*.jpg")}
+    source_imgs = list(source_path.glob("*.jpg"))
 
 
-def process_thread(data_file_path: Path):
+def process_thread(data_file_path: Path, collage_path: Path, source_path: Path):
     global process_list, source_imgs
     model = YOLO('yolov8x-pose-p6.pt')  # load the pretrained model
 
@@ -101,7 +101,7 @@ def process_thread(data_file_path: Path):
 
         collage_img_path = process_list.pop(0)
         already_processed = collage_img_path.name in data
-        process_result = process_collage(collage_img_path, source_imgs, model, already_processed)
+        process_result = process_collage(collage_img_path, source_path, model, already_processed)
         if already_processed:
             print(f"Skipping {collage_img_path.name}, already in database")
             continue
@@ -121,5 +121,5 @@ if __name__ == '__main__':
     data = load_data(data_file_path)
     watcher(args.collage_dir, args.source_dir)
     prepare_file_lists(args.collage_dir, args.source_dir)
-    threading.Thread(target=process_thread, args=[data_file_path]).start()
+    threading.Thread(target=process_thread, args=[data_file_path, args.collage_dir, args.source_dir]).start()
     app.run(host="::", port=5000, debug=True, use_reloader=False)
