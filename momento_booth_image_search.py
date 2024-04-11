@@ -7,7 +7,7 @@ from momento_booth import *
 def get_matching_images(test_encodings, data: dict[str, dict], tolerance=0.6) -> list[Path]:
     matches = []
     for (image, img_data) in data.items():
-        np_encodings = [np.array(face) for face in img_data['faces']]
+        np_encodings = [np.array(face) for face in img_data['faces']['encodings']]
         if len(np_encodings) == 0:
             continue
         image_match = False

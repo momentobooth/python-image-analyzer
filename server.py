@@ -10,7 +10,7 @@ from momento_booth_image_search import get_matching_images
 
 app = Flask(__name__)
 last_image = None
-last_analysis = None
+last_analysis: FacesResult | None = None
 process_list = []
 source_imgs = {}
 data = {}
@@ -26,10 +26,16 @@ def hello_world():
 def upload_image():
     global last_image, last_analysis
     last_image = Image.open(request.files['file'].stream)
-    last_analysis = get_faces([last_image]).encodings
-    if len(last_analysis) == 0:
+    save_location = args.source_dir.parent.joinpath("upload.jpg")
+    last_image.save(save_location)
+    last_analysis = get_faces([last_image], save_location)
+    if len(last_analysis.encodings) == 0:
         return "No faces", 422
-    return f"{len(last_analysis)}"
+    print(f"Found {len(last_analysis.encodings)} faces. {last_analysis.encodings[0][0:4]}")
+    return jsonify({
+        "num": len(last_analysis.encodings),
+        "locations": last_analysis.locations,
+    })
 
 
 @app.route("/get-matching-imgs", methods=["GET"])
@@ -41,25 +47,29 @@ def get_matching_imgs():
         return "No faces were detected in last image", 412
 
     tolerance = request.args.get('tolerance', default=0.6, type=float)
-    matching_images = get_matching_images(last_analysis, data, tolerance=tolerance)
+    matching_images = get_matching_images(last_analysis.encodings, data, tolerance=tolerance)
+    print(f"Found {len(matching_images)} matches.")
     return jsonify(matching_images)
 
 
 class CollageWatcherHandler(FileSystemEventHandler):
-    def on_created(self, event: FileSystemEvent):
-        print(f"Collage got created, {event.src_path}")
+    def on_created(self, event: FileSystemEvent, log=True):
+        if log:
+            print(f"Collage got created, {event.src_path}")
         process_list.append(Path(event.src_path))
         pass
 
     def on_modified(self, event: FileSystemEvent):
-        self.on_deleted(event)
-        self.on_created(event)
+        print(f"Collage was modified, {event.src_path}")
+        # self.on_deleted(event, False)
+        # self.on_created(event, False)
 
-    def on_deleted(self, event: FileSystemEvent):
+    def on_deleted(self, event: FileSystemEvent, log=True):
         p = Path(event.src_path)
         del data[p.name]
         save_data(data, data_file_path)
-        print(f"Collage got removed, {event.src_path}")
+        if log:
+            print(f"Collage got removed, {event.src_path}")
 
 
 class SourceWatcherHandler(FileSystemEventHandler):
