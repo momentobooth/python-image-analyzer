@@ -17,6 +17,13 @@ face_lock = threading.Lock()
 np_dtype = np.float64
 
 
+class NumpyJsonEncoder(json.JSONEncoder):
+    def default(self, obj):
+        if isinstance(obj, np.ndarray):
+            return obj.tolist()
+        return json.JSONEncoder.default(self, obj)
+
+
 def detect_people(model: YOLO, img: Path) -> yolo_results.Results:
     return model.predict(img, conf=0.5, verbose=False)[0]
 
@@ -200,14 +207,18 @@ def process_collage(collage: Path, source_dir: Path, model: YOLO, already_proces
 def load_data(file_path: Path) -> dict:
     if file_path.is_file():
         with open(file_path, "r") as f:
-            return json.loads(f.read())
+            try:
+                return json.loads(f.read())
+            except json.decoder.JSONDecodeError:
+                print("Could not parse json from file, assuming empty")
+                return {}
     else:
         return {}
 
 
 def save_data(data:dict, file_path: Path):
     with open(file_path, "w") as f:
-        f.write(json.dumps(data))
+        f.write(json.dumps(data, cls=NumpyJsonEncoder))
 
 
 if __name__ == "__main__":
