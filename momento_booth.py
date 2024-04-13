@@ -8,11 +8,13 @@ import numpy as np
 from PIL import Image
 import piexif
 import json
+from base64 import encodebytes, decodebytes
 
 from ultralytics import YOLO
 import ultralytics.engine.results as yolo_results
 
 face_lock = threading.Lock()
+np_dtype = np.float64
 
 
 def detect_people(model: YOLO, img: Path) -> yolo_results.Results:
@@ -67,7 +69,7 @@ def get_faces(sources: list[Path | Image.Image], collage_path: Path | None = Non
             pil_image.save(collage_path.parent.joinpath("faces", filename))
 
     start_encoding_face = time.time()
-    face_encodings = face_recognition.face_encodings(np_image, imgs_faces[best_photo_index])
+    face_encodings = np.array(face_recognition.face_encodings(np_image, imgs_faces[best_photo_index]), dtype=np_dtype)
     face_end = time.time()
     face_lock.release()
     return FacesResult(face_encodings, imgs_faces[best_photo_index], start_encoding_face - start_detecting_face, face_end - start_encoding_face)
@@ -94,19 +96,68 @@ def date_from_exif(exif_dict: dict) -> datetime:
     return datetime.strptime(date_raw, "%Y:%m:%d %H:%M:%S")
 
 
-def process_collage(collage: Path, source_dir: Path, model: YOLO, already_processed=False) -> (dict, None):
+def serialize_encodings(encodings: np.ndarray) -> str:
+    """
+    Serialize encodings in numpy format to a string.
+
+    :param encodings: The array with encodings to be serialized
+    :return: The serialized string
+    """
+    return encodebytes(encodings.astype(np_dtype).tobytes()).decode("ascii")
+
+
+def deserialize_encodings(encodings: str) -> np.ndarray:
+    """
+    Parse encodings from a string to a numpy array.
+
+    :param encodings: The string with encodings to be deserialized
+    :return: The deserialized array
+    """
+    array = np.frombuffer(decodebytes(encodings.encode("ascii")), dtype=np_dtype)
+    return array.reshape((array.size // 128, 128))
+
+
+def save_img_with_maker_note(img_path: Path, maker_note: dict, img: Image.Image | None = None) -> None:
+    """
+    Save an image with given maker note in the exif metadata.
+
+    :param img_path: Path to the collage image.
+    :param maker_note: Dictionary with metadata about the image.
+    :param img: Image to be saved. If not provided, the image will be loaded from the given path.
+    """
+    if img is None:
+        img = Image.open(img_path)
+
+    exif_dict = piexif.load(img.info["exif"])
+    exif_dict["Exif"][piexif.ExifIFD.MakerNote] = json.dumps(maker_note).encode('utf-8')
+
+    exif_bytes = piexif.dump(exif_dict)
+    img.save(img_path, "jpeg", exif=exif_bytes)
+    print(f"Saved maker note exif to {img_path.name}")
+
+
+def process_collage(collage: Path, source_dir: Path, model: YOLO, already_processed=False) -> dict | None:
     start = time.time()
     pillow_collage_img = Image.open(collage)
     print(f"Opening image {collage.stem}")
     exif_dict = piexif.load(pillow_collage_img.info["exif"])
     json_str = exif_dict["Exif"][piexif.ExifIFD.MakerNote]
-    json_obj = json.loads(json_str)
+    json_obj: dict = json.loads(json_str)
+
+    has_analysis = json_obj.get("faces", None) is not None
+    if has_analysis:
+        json_obj['faces']['encodings'] = deserialize_encodings(json_obj['faces']['encodings'])
+    if has_analysis and not already_processed:
+        print("Got analysis from collage metadata")
+        return json_obj
+    if already_processed:
+        print("Analysis in data but not collage metadata!!!")
+        return None
+
     raw_sources = [source['filename'] for source in json_obj["sourcePhotos"]]
     found_sources = (find_image(source, collage, source_dir) for source in raw_sources)
     sources = [s for s in found_sources if s is not None]
     print(f"\toriginal sources: {raw_sources}, resolved = {[f.name for f in sources]}")
-    if already_processed:
-        return None
 
     if len(sources) == 0:
         print("\tCould not find source files, skipping")
@@ -119,6 +170,18 @@ def process_collage(collage: Path, source_dir: Path, model: YOLO, already_proces
     face_results = get_faces(sources, collage)
     print(f"\tFound {len(face_results.encodings)} face(s). Locating {face_results.speed['detection']:.1f} ms, encoding {face_results.speed['encoding']:.1f} ms.")
     end = time.time()
+
+    # Add analysis results to the metadata
+    json_obj.update({
+        "people_count": len(result.boxes),
+        "faces": {
+            "count": len(face_results.encodings),
+            "locations": face_results.locations,
+            "encodings": serialize_encodings(face_results.encodings)
+        }
+    })
+    # Save the metadata back to the file
+    save_img_with_maker_note(collage, json_obj, pillow_collage_img)
 
     return {
         "people_count": len(result.boxes),
