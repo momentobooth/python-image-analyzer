@@ -1,0 +1,32 @@
+[project]
+name = "MomentoBooth-PIA-sever"
+version = "0.0.1"
+authors = [
+  { name="Casper Cromjongh", email="casper.cromjongh@hotmail.com" },
+]
+description = "The MomentoBooth Python-image-analyzer server analyzes the collage outputs from MomentoBooth with deep learning models to acquire additional information about its contents."
+readme = "README.md"
+requires-python = ">=3.9"
+dependencies = [
+    "ultralytics",
+    "face_recognition",
+    "setuptools",
+    "flask",
+    "watchdog",
+    "piexif",
+]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Operating System :: OS Independent",
+    "Development Status :: 4 - Beta",
+]
+
+[build-system]
+requires = ["flit_core<4"]
+build-backend = "flit_core.buildapi"
+
+[project.scripts]
+flit = "momento_booth_pia:main"
+
+[tool.flit.module]
+name = "momento_booth_pia"

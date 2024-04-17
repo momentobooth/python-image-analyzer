@@ -1,7 +1,9 @@
 import os
 from pathlib import Path
 
-from momento_booth import *
+import numpy as np
+import face_recognition
+from momento_booth_pia.momento_booth import load_data, get_faces
 
 
 def get_matching_images(test_encodings, data: dict[str, dict], tolerance=0.6) -> list[Path]:

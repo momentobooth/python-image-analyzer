@@ -8,8 +8,8 @@ from watchdog.events import FileSystemEventHandler, FileSystemEvent
 from watchdog.observers import Observer
 from PIL import Image
 from ultralytics import YOLO
-from momento_booth import process_collage, get_faces, save_data, load_data, FacesResult
-from momento_booth_image_search import get_matching_images
+from momento_booth_pia.momento_booth import process_collage, get_faces, save_data, load_data, FacesResult
+from momento_booth_pia.momento_booth_image_search import get_matching_images
 
 app = Flask(__name__)
 last_image = None
@@ -131,7 +131,7 @@ def main():
     parser.add_argument("-p", "--port", default=3232, type=int, help="Port to run the server on")
     parser.add_argument("--host", default="localhost",
                         help="""Host to run the server on. Use "::" to accept requests for all interfaces""")
-    parser.add_argument("-m", "--model", default="yolov8x - pose - p6.pt", help="Choose the model used for YOLOv8")
+    parser.add_argument("-m", "--model", default="yolov8x-pose-p6.pt", help="Choose the model used for YOLOv8")
     args = parser.parse_args()
     print(f"Running with \n - Collage dir: {args.collage_dir}\n - Source dir: {args.source_dir}")
 
@@ -140,7 +140,7 @@ def main():
     data = load_data(data_file_path)
     watcher(args.collage_dir, args.source_dir)
     prepare_file_lists(args.collage_dir, args.source_dir)
-    model_path = Path(__file__).parent.joinpath("models", args.model)
+    model_path = Path(__file__).parent.parent.joinpath("models", args.model)
     threading.Thread(target=process_thread,
                      args=[data_file_path, args.collage_dir, args.source_dir, model_path]
                      ).start()
