@@ -1,11 +1,14 @@
 import argparse
 import threading
+from pathlib import Path
+import time
 
 from flask import Flask, request, send_from_directory, jsonify
 from watchdog.events import FileSystemEventHandler, FileSystemEvent
 from watchdog.observers import Observer
 from PIL import Image
-from momento_booth import *
+from ultralytics import YOLO
+from momento_booth import process_collage, get_faces, save_data, load_data, FacesResult
 from momento_booth_image_search import get_matching_images
 
 app = Flask(__name__)
@@ -99,9 +102,9 @@ def prepare_file_lists(collage_path: Path, source_path: Path):
     source_imgs = list(source_path.glob("*.jpg"))
 
 
-def process_thread(data_file_path: Path, collage_path: Path, source_path: Path):
+def process_thread(data_file_path: Path, collage_path: Path, source_path: Path, model_path: Path | str):
     global process_list, source_imgs
-    model = YOLO('yolov8x-pose-p6.pt')  # load the pretrained model
+    model = YOLO(model_path)  # load the pretrained model
 
     while True:
         # If there are no images to process, sleep for a bit
@@ -120,16 +123,29 @@ def process_thread(data_file_path: Path, collage_path: Path, source_path: Path):
             save_data(data, data_file_path)
 
 
-if __name__ == '__main__':
+def main():
+    global args, data, data_file_path
     parser = argparse.ArgumentParser(description="MomentoBooth image processing companion server")
-    parser.add_argument("--collage-dir", type=directory_type, help="Output directory")
-    parser.add_argument("--source-dir", type=directory_type, help="Input file(s) or directory")
+    parser.add_argument( "-c","--collage-dir", type=directory_type, help="Collage directory")
+    parser.add_argument("-s", "--source-dir", type=directory_type, help="Input file(s) or directory")
+    parser.add_argument("-p", "--port", default=3232, type=int, help="Port to run the server on")
+    parser.add_argument("--host", default="localhost",
+                        help="""Host to run the server on. Use "::" to accept requests for all interfaces""")
+    parser.add_argument("-m", "--model", default="yolov8x - pose - p6.pt", help="Choose the model used for YOLOv8")
     args = parser.parse_args()
     print(f"Running with \n - Collage dir: {args.collage_dir}\n - Source dir: {args.source_dir}")
 
-    data_file_path = Path("data.json")
+    # Could also use Path(__file__).parent as folder
+    data_file_path = args.collage_dir.joinpath("data.json")
     data = load_data(data_file_path)
     watcher(args.collage_dir, args.source_dir)
     prepare_file_lists(args.collage_dir, args.source_dir)
-    threading.Thread(target=process_thread, args=[data_file_path, args.collage_dir, args.source_dir]).start()
-    app.run(host="::", port=5000, debug=True, use_reloader=False)
+    model_path = Path(__file__).parent.joinpath("models", args.model)
+    threading.Thread(target=process_thread,
+                     args=[data_file_path, args.collage_dir, args.source_dir, model_path]
+                     ).start()
+    app.run(host=args.host, port=args.port, debug=True, use_reloader=False)
+
+
+if __name__ == '__main__':
+    main()
