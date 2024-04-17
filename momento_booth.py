@@ -180,12 +180,10 @@ def process_collage(collage: Path, source_dir: Path, model: YOLO, already_proces
 
     # Add analysis results to the metadata
     json_obj.update({
-        "people_count": len(result.boxes),
-        "faces": {
-            "count": len(face_results.encodings),
-            "locations": face_results.locations,
-            "encodings": serialize_encodings(face_results.encodings)
-        }
+        "peopleCount": len(result.boxes),
+        "faceCount": len(face_results.encodings),
+        "faceLocations": face_results.locations,
+        "faceEncodings": serialize_encodings(face_results.encodings)
     })
     # Save the metadata back to the file
     save_img_with_maker_note(collage, json_obj, pillow_collage_img)
