@@ -73,6 +73,8 @@ def get_faces(sources: list[Path | Image.Image], collage_path: Path | None = Non
             face_image = np_image[top:bottom, left:right]
             pil_image = Image.fromarray(face_image)
             filename = f"{collage_path.stem}-face-{index+1}.jpg"
+            faces_dir = collage_path.parent.joinpath("faces")
+            faces_dir.mkdir(exist_ok=True)
             pil_image.save(collage_path.parent.joinpath("faces", filename))
 
     start_encoding_face = time.time()

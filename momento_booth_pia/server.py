@@ -15,7 +15,7 @@ app = Flask(__name__)
 last_image = None
 last_analysis: FacesResult | None = None
 process_list = []
-source_imgs = {}
+source_imgs = []
 data = {}
 
 
@@ -57,19 +57,27 @@ def get_matching_imgs():
 
 class CollageWatcherHandler(FileSystemEventHandler):
     def on_created(self, event: FileSystemEvent, log=True):
+        path = Path(event.src_path)
+        if path.is_dir() or (path.suffix.lower() not in ['.jpg', '.jpeg', '.png']):
+            return
         if log:
             print(f"Collage got created, {event.src_path}")
-        process_list.append(Path(event.src_path))
+        process_list.append(path)
         pass
 
     def on_modified(self, event: FileSystemEvent):
+        path = Path(event.src_path)
+        if path.is_dir() or (path.suffix.lower() not in ['.jpg', '.jpeg', '.png']):
+            return
         print(f"Collage was modified, {event.src_path}")
         # self.on_deleted(event, False)
         # self.on_created(event, False)
 
     def on_deleted(self, event: FileSystemEvent, log=True):
-        p = Path(event.src_path)
-        del data[p.name]
+        path = Path(event.src_path)
+        if path.is_dir() or (path.suffix.lower() not in ['.jpg', '.jpeg', '.png']):
+            return
+        del data[path.name]
         save_data(data, data_file_path)
         if log:
             print(f"Collage got removed, {event.src_path}")
@@ -126,7 +134,7 @@ def process_thread(data_file_path: Path, collage_path: Path, source_path: Path, 
 def main():
     global args, data, data_file_path
     parser = argparse.ArgumentParser(description="MomentoBooth image processing companion server")
-    parser.add_argument( "-c","--collage-dir", type=directory_type, help="Collage directory")
+    parser.add_argument("-c", "--collage-dir", type=directory_type, help="Collage directory")
     parser.add_argument("-s", "--source-dir", type=directory_type, help="Input file(s) or directory")
     parser.add_argument("-p", "--port", default=3232, type=int, help="Port to run the server on")
     parser.add_argument("--host", default="localhost",
