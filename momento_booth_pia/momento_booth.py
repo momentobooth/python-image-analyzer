@@ -151,14 +151,15 @@ def process_collage(collage: Path, source_dir: Path, model: YOLO, already_proces
     json_str = exif_dict["Exif"][piexif.ExifIFD.MakerNote]
     json_obj: dict = json.loads(json_str)
 
-    has_analysis = json_obj.get("faces", None) is not None
+    has_analysis = json_obj.get("faceEncodings", None) is not None
     if has_analysis:
-        json_obj['faces']['encodings'] = deserialize_encodings(json_obj['faces']['encodings'])
+        json_obj['faceEncodings'] = deserialize_encodings(json_obj['faceEncodings'])
     if has_analysis and not already_processed:
         print("Got analysis from collage metadata")
         return json_obj
     if already_processed:
-        print("Analysis in data but not collage metadata!!!")
+        if not has_analysis:
+            print("Analysis in data but not collage metadata!!!")
         return None
 
     raw_sources = [source['filename'] for source in json_obj["sourcePhotos"]]
@@ -188,18 +189,7 @@ def process_collage(collage: Path, source_dir: Path, model: YOLO, already_proces
     # Save the metadata back to the file
     save_img_with_maker_note(collage, json_obj, pillow_collage_img)
 
-    return {
-        "people_count": len(result.boxes),
-        "sources": {
-            "original": raw_sources,
-            "resolved": [f.name for f in sources]
-        },
-        "faces": {
-            "count": len(face_results.encodings),
-            "locations": face_results.locations,
-            "encodings": [encodings.tolist() for encodings in face_results.encodings]
-        }
-    }
+    return json_obj
 
 
 def load_data(file_path: Path) -> dict:
