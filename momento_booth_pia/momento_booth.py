@@ -1,3 +1,4 @@
+import msvcrt
 import threading
 import time
 from pathlib import Path
@@ -9,13 +10,22 @@ from PIL import Image
 import piexif
 import json
 from base64 import encodebytes, decodebytes
-from filehash.filehash import FileHash, FileHashResult, VerifyHashResult
+from filehash.filehash import FileHash
+import win32file
 
 from ultralytics import YOLO
 import ultralytics.engine.results as yolo_results
 
 face_lock = threading.Lock()
 np_dtype = np.float64
+
+
+def open_with_lock(file: Path):
+    # https://mhammond.github.io/pywin32/win32file__CreateFile_meth.html
+    # CreateFile(fileName, desiredAccess, shareMode, attributes, CreationDisposition, flagsAndAttributes, hTemplateFile)
+    handle = win32file.CreateFile(str(file), win32file.GENERIC_WRITE, 0, None, win32file.OPEN_EXISTING, 0, 0)
+    fd = msvcrt.open_osfhandle(handle.handle, 0)
+    return fd
 
 
 class FileChangedException(Exception):
@@ -146,7 +156,8 @@ def save_img_with_maker_note(img_path: Path, maker_note: dict, img: Image.Image 
     exif_dict["Exif"][piexif.ExifIFD.MakerNote] = json.dumps(maker_note).encode('utf-8')
 
     exif_bytes = piexif.dump(exif_dict)
-    img.save(img_path, "jpeg", exif=exif_bytes)
+    with open(open_with_lock(img_path), "wb") as f:
+        img.save(f, "jpeg", exif=exif_bytes)
     print(f"Saved maker note exif to {img_path.name}")
 
 
