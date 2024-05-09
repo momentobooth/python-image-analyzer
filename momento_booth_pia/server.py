@@ -135,6 +135,8 @@ def process_thread(data_file_path: Path, collage_path: Path, source_path: Path, 
                 break
             except FileChangedException as e:
                 print(f"{collage_img_path.name} changed during processing, retrying...")
+            except IOError as e:
+                print(f"IOError occured while processing {collage_img_path.name}:\n{e}")
         if already_processed:
             print(f"Skipping {collage_img_path.name}, already in database")
             continue
