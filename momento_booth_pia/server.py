@@ -65,16 +65,18 @@ class CollageWatcherHandler(FileSystemEventHandler):
             return
         if log:
             print(f"Collage got created, {event.src_path}")
-        process_list.append(path)
+        if path not in process_list:
+            process_list.append(path)
         pass
 
     def on_modified(self, event: FileSystemEvent):
         path = Path(event.src_path)
         if path.is_dir() or (path.suffix.lower() not in ['.jpg', '.jpeg', '.png']):
             return
-        print(f"Collage was modified, {event.src_path}")
+        if path not in process_list:
+            print(f"Collage was modified, {event.src_path}")
         # self.on_deleted(event, False)
-        # self.on_created(event, False)
+        self.on_created(event, False)
 
     def on_deleted(self, event: FileSystemEvent, log=True):
         path = Path(event.src_path)

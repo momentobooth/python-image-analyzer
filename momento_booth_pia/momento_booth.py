@@ -164,13 +164,11 @@ def process_collage(collage: Path, source_dir: Path, model: YOLO, already_proces
     has_analysis = json_obj.get("faceEncodings", None) is not None
     if has_analysis:
         json_obj['faceEncodings'] = deserialize_encodings(json_obj['faceEncodings'])
-    if has_analysis and not already_processed:
-        print("Got analysis from collage metadata")
+        print("\tGot analysis from collage metadata")
         return json_obj
     if already_processed:
         if not has_analysis:
-            print("Analysis in data but not collage metadata!!!")
-        return None
+            print("\tAnalysis in data but not collage metadata, assuming new file")
 
     raw_sources = [source['filename'] for source in json_obj["sourcePhotos"]]
     found_sources = (find_image(source, collage, source_dir) for source in raw_sources)
@@ -204,6 +202,8 @@ def process_collage(collage: Path, source_dir: Path, model: YOLO, already_proces
     # Save the metadata back to the file
     save_img_with_maker_note(collage, json_obj, pillow_collage_img)
 
+    return_obj = dict(json_obj)
+    return_obj['faceEncodings'] = face_results.encodings
     return json_obj
 
 
