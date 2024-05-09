@@ -1,3 +1,4 @@
+import io
 import threading
 import time
 from pathlib import Path
@@ -156,7 +157,9 @@ def process_collage(collage: Path, source_dir: Path, model: YOLO, already_proces
     print(f"Opening image {collage.stem}")
     hash_compare = hasher.hash_file(collage)
 
-    pillow_collage_img = Image.open(collage)
+    # Prevent an open shared file lock (by Pillow) by reading and directly closing the file
+    with open(collage, "rb") as f:
+        pillow_collage_img = Image.open(io.BytesIO(f.read()))
     exif_dict = piexif.load(pillow_collage_img.info["exif"])
     json_str = exif_dict["Exif"][piexif.ExifIFD.MakerNote]
     json_obj: dict = json.loads(json_str)
