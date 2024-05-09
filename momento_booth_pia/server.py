@@ -77,7 +77,8 @@ class CollageWatcherHandler(FileSystemEventHandler):
         path = Path(event.src_path)
         if path.is_dir() or (path.suffix.lower() not in ['.jpg', '.jpeg', '.png']):
             return
-        del data[path.name]
+        if data.get(path.name) is not None:
+            del data[path.name]
         save_data(data, data_file_path)
         if log:
             print(f"Collage got removed, {event.src_path}")
