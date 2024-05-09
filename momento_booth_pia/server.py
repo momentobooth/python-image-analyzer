@@ -8,7 +8,7 @@ from watchdog.events import FileSystemEventHandler, FileSystemEvent
 from watchdog.observers import Observer
 from PIL import Image
 from ultralytics import YOLO
-from momento_booth_pia.momento_booth import process_collage, get_faces, save_data, load_data, FacesResult
+from momento_booth_pia.momento_booth import process_collage, get_faces, save_data, load_data, FacesResult, FileChangedException
 from momento_booth_pia.momento_booth_image_search import get_matching_images
 
 app = Flask(__name__)
@@ -122,7 +122,12 @@ def process_thread(data_file_path: Path, collage_path: Path, source_path: Path, 
 
         collage_img_path = process_list.pop(0)
         already_processed = collage_img_path.name in data
-        process_result = process_collage(collage_img_path, source_path, model, already_processed)
+        while True:
+            try:
+                process_result = process_collage(collage_img_path, source_path, model, already_processed)
+                break
+            except FileChangedException as e:
+                print(f"{collage_img_path.name} changed during processing, retrying...")
         if already_processed:
             print(f"Skipping {collage_img_path.name}, already in database")
             continue

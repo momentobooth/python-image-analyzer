@@ -9,12 +9,17 @@ from PIL import Image
 import piexif
 import json
 from base64 import encodebytes, decodebytes
+from filehash.filehash import FileHash, FileHashResult, VerifyHashResult
 
 from ultralytics import YOLO
 import ultralytics.engine.results as yolo_results
 
 face_lock = threading.Lock()
 np_dtype = np.float64
+
+
+class FileChangedException(Exception):
+    pass
 
 
 class NumpyJsonEncoder(json.JSONEncoder):
@@ -146,9 +151,12 @@ def save_img_with_maker_note(img_path: Path, maker_note: dict, img: Image.Image 
 
 
 def process_collage(collage: Path, source_dir: Path, model: YOLO, already_processed=False) -> dict | None:
+    hasher = FileHash("blake2b")
     start = time.time()
-    pillow_collage_img = Image.open(collage)
     print(f"Opening image {collage.stem}")
+    hash_compare = hasher.hash_file(collage)
+
+    pillow_collage_img = Image.open(collage)
     exif_dict = piexif.load(pillow_collage_img.info["exif"])
     json_str = exif_dict["Exif"][piexif.ExifIFD.MakerNote]
     json_obj: dict = json.loads(json_str)
@@ -176,6 +184,8 @@ def process_collage(collage: Path, source_dir: Path, model: YOLO, already_proces
 
     result = detect_people(model, last_source)
     print(f"\tDetected {len(result.boxes)} people in {sum(result.speed.values()):.1f} ms")
+    if hasher.hash_file(collage) != hash_compare:
+        raise FileChangedException("Hash mismatch")
 
     face_results = get_faces(sources, collage)
     print(f"\tFound {len(face_results.encodings)} face(s). Locating {face_results.speed['detection']:.1f} ms, encoding {face_results.speed['encoding']:.1f} ms.")
@@ -188,6 +198,9 @@ def process_collage(collage: Path, source_dir: Path, model: YOLO, already_proces
         "faceLocations": face_results.locations,
         "faceEncodings": serialize_encodings(face_results.encodings)
     })
+
+    if hasher.hash_file(collage) != hash_compare:
+        raise FileChangedException("Hash mismatch")
     # Save the metadata back to the file
     save_img_with_maker_note(collage, json_obj, pillow_collage_img)
 
@@ -225,7 +238,13 @@ if __name__ == "__main__":
     i = 0
     for collage_img_path in output_imgs:
         already_processed = collage_img_path.name in data
-        process_result = process_collage(collage_img_path, source_dir, model, already_processed)
+
+        while True:
+            try:
+                process_result = process_collage(collage_img_path, source_dir, model, already_processed)
+                break
+            except FileChangedException as e:
+                print(f"{collage_img_path.name} changed during processing, retrying...")
         if already_processed:
             print(f"Skipping {collage_img_path.name}, already in database")
             continue
