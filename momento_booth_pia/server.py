@@ -1,4 +1,5 @@
 import argparse
+import signal
 import threading
 from pathlib import Path
 import time
@@ -17,6 +18,8 @@ last_analysis: FacesResult | None = None
 process_list = []
 source_imgs = []
 data = {}
+observer: Observer | None = None
+running = True
 
 
 @app.route("/")
@@ -92,6 +95,7 @@ class SourceWatcherHandler(FileSystemEventHandler):
 
 
 def watcher(collage_path: Path, source_path: Path):
+    global observer
     observer = Observer()
     observer.schedule(CollageWatcherHandler(), path=str(collage_path), recursive=False)
     observer.schedule(SourceWatcherHandler(), path=str(source_path), recursive=False)
@@ -115,7 +119,7 @@ def process_thread(data_file_path: Path, collage_path: Path, source_path: Path, 
     global process_list, source_imgs
     model = YOLO(model_path)  # load the pretrained model
 
-    while True:
+    while running:
         # If there are no images to process, sleep for a bit
         if len(process_list) == 0:
             time.sleep(0.1)
@@ -135,6 +139,14 @@ def process_thread(data_file_path: Path, collage_path: Path, source_path: Path, 
         if process_result is not None:
             data[collage_img_path.name] = process_result
             save_data(data, data_file_path)
+
+
+def sigint_handler():
+    global running
+    print("Exiting...")
+    if observer is not None:
+        observer.stop()
+    running = False
 
 
 def main():
@@ -159,6 +171,7 @@ def main():
                      args=[data_file_path, args.collage_dir, args.source_dir, model_path]
                      ).start()
     app.run(host=args.host, port=args.port, debug=True, use_reloader=False)
+    sigint_handler()
 
 
 if __name__ == '__main__':
